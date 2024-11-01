@@ -1,5 +1,5 @@
 # Changelog
-## 3.2.5
+## 3.2.4-1
 
 ## [3.2.4](https://github.com/xihan123/QDReadHook/compare/v3.2.4...v3.2.4) (2024-09-19)
 
