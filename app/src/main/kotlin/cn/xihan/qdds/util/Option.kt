@@ -691,7 +691,9 @@ data class OptionEntity(
         var enableShowReaderPageChapterSaveAudioDialog: Boolean = false,
         var enableCopyReaderPageChapterComment: Boolean = false,
         var enableReadTimeFactor: Boolean = false,
-        var speedFactor: Int = 5
+//        var speedFactor: Int = 5
+        var timeFactor: Int = 1,
+        var lastTime: Long = 0,
     )
 
     /**

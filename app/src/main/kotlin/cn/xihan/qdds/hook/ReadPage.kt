@@ -10,6 +10,7 @@ import cn.xihan.qdds.util.CustomEditText
 import cn.xihan.qdds.util.CustomLinearLayout
 import cn.xihan.qdds.util.CustomTextView
 import cn.xihan.qdds.util.Option
+import cn.xihan.qdds.util.Option.updateOptionEntity
 import cn.xihan.qdds.util.Option.optionEntity
 import cn.xihan.qdds.util.Option.redirectThemePath
 import cn.xihan.qdds.util.Utils
@@ -34,6 +35,9 @@ import com.highcapable.yukihookapi.hook.type.java.UnitType
 import org.luckypray.dexkit.DexKitBridge
 import java.io.File
 import java.lang.reflect.Modifier
+import java.time.LocalTime
+import java.time.temporal.ChronoField
+import java.util.LinkedList
 
 /**
  * # 重定向阅读页背景路径
@@ -287,7 +291,7 @@ private fun Context.audioExportDialog(networkUrl: String, filePath: String) {
  * @param [speedFactor] 速度系数
  */
 fun PackageParam.readingTimeSpeedFactor(
-    versionCode: Int, speedFactor: Int = 5, bridge: DexKitBridge
+    versionCode: Int, bridge: DexKitBridge
 ) {
     when (versionCode) {
         in 1336..1499 -> {
@@ -311,34 +315,55 @@ fun PackageParam.readingTimeSpeedFactor(
                         paramCount(methodData.paramTypeNames.size)
                         returnType = ListClass
                     }.hook().after {
-                        val list = result.safeCast<MutableList<*>>()
-                        if (list.isNullOrEmpty()) return@after
-                        list.forEach { item ->
-                            item?.let {
-                                val totalTime = it.getParam<Long>("totalTime")
-                                if (optionEntity.mainOption.enableCollectService) {
-                                    val bookId = it.getParam<Long>("bookId")
-                                    val startTime = it.getParam<Long>("startTime")
-                                    val endTime = it.getParam<Long>("endTime")
-                                    if (bookId != null && startTime != null && endTime != null && totalTime != null) {
-                                        Collect.sendReadingRecord(
-                                            bookId = bookId,
-                                            startTime = startTime,
-                                            endTime = endTime,
-                                            duration = totalTime
-                                        )
-                                    }
-                                }
-                                val currentTime = System.currentTimeMillis()
-                                val startTime2 = currentTime - ((totalTime ?: 10000) * speedFactor)
-                                it.setParams(
-                                    "startTime" to startTime2,
-                                    "endTime" to currentTime,
-                                    "totalTime" to (currentTime - startTime2),
-                                    "chapterVIP" to 1
-                                )
+                        val list = result.safeCast<MutableList<*>>()?.takeIf { it.size == 1 }
+                            ?: return@after
+                        val item = list.first().takeIf { it != null } ?: return@after
+                        val option = optionEntity.readPageOption
+                        val endTime = item.getParam<Long>("endTime") ?: 0L
+                        val totalTime = item.getParam<Long>("totalTime") ?: 0L
+                        var total = endTime - option.lastTime
+                        if (total <= 0) return@after
+                        option.lastTime = endTime
+                        updateOptionEntity()
+                        if (total == endTime) return@after
+                        total = total * option.timeFactor / 100
+                        if (total <= totalTime) return@after
+                        val max =
+                            LocalTime.now().getLong(ChronoField.MILLI_OF_DAY).takeIf { it > total }
+                                ?: total
+
+                        fun cloneObject(obj: Any): Any {
+                            val clone = obj.javaClass.declaredConstructors.first().newInstance(null)
+                            obj.javaClass.declaredFields.forEach { field ->
+                                field.isAccessible = true
+                                field[clone] = field[obj]
                             }
+                            return clone
                         }
+
+                        val newList = LinkedList<Any>()
+                        var remainingTime = max
+
+                        val maxTimePerCycle = 20 * 60 * 1000L
+
+                        while (remainingTime > 0) {
+                            val cycleTime = remainingTime.coerceAtMost(maxTimePerCycle)
+                            val clone = cloneObject(item)
+
+                            val startTime = endTime - remainingTime
+
+                            clone.setParams(
+                                "startTime" to startTime,
+                                "endTime" to (startTime + cycleTime),
+                                "totalTime" to cycleTime,
+                                "chapterVIP" to 1
+                                )
+                            newList.addFirst(clone)
+                            remainingTime -= cycleTime + randomTime()
+                            }
+                        result = newList
+                        }
+
                     }
                 }
             }

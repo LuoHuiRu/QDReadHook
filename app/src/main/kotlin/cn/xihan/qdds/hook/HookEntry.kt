@@ -188,7 +188,7 @@ class HookEntry : IYukiHookXposedInit, KoinComponent {
         if (optionEntity.readPageOption.enableReadTimeFactor) {
             readingTimeSpeedFactor(
                 versionCode = versionCode,
-                speedFactor = optionEntity.readPageOption.speedFactor,
+//                speedFactor = optionEntity.readPageOption.speedFactor,
                 bridge = bridge
             )
         }
